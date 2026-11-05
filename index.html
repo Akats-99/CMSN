@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Troll</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: radial-gradient(circle, #1a0033, #050010);
+            min-height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        /* Container chính */
+        .container {
+            text-align: center;
+            z-index: 10;
+            padding: 20px;
+            pointer-events: none; /* Để bấm xuyên qua canvas phía sau */
+        }
+
+        /* Hiệu ứng chữ đổi màu lung linh */
+        .wish-text {
+            font-size: 3rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            min-height: 80px;
+            background: linear-gradient(45deg, #ff007f, #ff00ff, #00ffff, #ff007f);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-move 6s ease infinite, pulse 2s ease-in-out infinite;
+            text-shadow: 0 0 20px rgba(255, 0, 127, 0.2);
+        }
+
+        @keyframes gradient-move {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        /* Canvas cho pháo hoa và bóng bay */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Hộp quà tương tác */
+        .gift-box {
+            font-size: 5rem;
+            cursor: pointer;
+            pointer-events: auto;
+            animation: bounce 1.5s infinite;
+            transition: transform 0.3s;
+            user-select: none;
+        }
+
+        .gift-box:hover {
+            transform: scale(1.2);
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas vẽ pháo hoa -->
+    <canvas id="fireworksCanvas"></canvas>
+
+    <div class="container">
+        <!-- Hộp quà bất ngờ ban đầu -->
+        <div id="gift" class="gift-box">🎁</div>
+        
+        <!-- Nội dung xuất hiện sau khi mở quà -->
+        <h1 id="text" class="wish-text hidden"></h1>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+        const gift = document.getElementById('gift');
+        const textElement = document.getElementById('text');
+        
+        const fullText = "CHÚC MỪNG SINH NHẬT NGUYỄN NHƯ KHOA";
+        let particles = [];
+        let confetti = [];
+        let animationFrame;
+
+        // Resize Canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Tạo class Particle cho Pháo Hoa
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 3 + 1;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 6 + 2;
+                this.velocity = { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+                this.alpha = 1;
+                this.friction = 0.98;
+                this.gravity = 0.05;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                this.velocity.x *= this.friction;
+                this.velocity.y *= this.friction;
+                this.velocity.y += this.gravity;
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.alpha -= 0.012;
+            }
+        }
+
+        // Tạo class Confetti cho hạt giấy rơi bay bổng
+        class Confetti {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * -canvas.height;
+                this.size = Math.random() * 8 + 4;
+                this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+                this.speedX = Math.random() * 2 - 1;
+                this.speedY = Math.random() * 3 + 2;
+                this.rotation = Math.random() * 360;
+                this.rotationSpeed = Math.random() * 4 - 2;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate((this.rotation * Math.PI) / 180);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+                ctx.restore();
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.rotation += this.rotationSpeed;
+                if (this.y > canvas.height) {
+                    this.y = -20;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+        }
+
+        // Kích nổ pháo hoa
+        function createFirework(x, y) {
+            const colors = ['#ff0055', '#00ffcc', '#ffcc00', '#ff00ff', '#00ff00', '#00ffff'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            for (let i = 0; i < 60; i++) {
+                particles.push(new Particle(x, y, randomColor));
+            }
+        }
+
+        // Vòng lặp Animation chính
+        function animate() {
+            ctx.fillStyle = 'rgba(5, 0, 16, 0.15)'; // Tạo hiệu ứng đuôi mờ cho pháo hoa
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Cập nhật pháo hoa
+            particles.forEach((p, index) => {
+                if (p.alpha <= 0) {
+                    particles.splice(index, 1);
+                } else {
+                    p.update();
+                    p.draw();
+                }
+            });
+
+            // Cập nhật hạt giấy rơi
+            confetti.forEach((c) => {
+                c.update();
+                c.draw();
+            });
+
+            // Tự động bắn pháo hoa ngẫu nhiên
+            if (Math.random() < 0.04) {
+                createFirework(Math.random() * canvas.width, Math.random() * (canvas.height * 0.6));
+            }
+
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        // Hiệu ứng chữ gõ từng ký tự (Typing Effect)
+        function typeWriter(text, index = 0) {
+            if (index < text.length) {
+                textElement.innerHTML += text.charAt(index);
+                setTimeout(() => typeWriter(text, index + 1), 100);
+            }
+        }
+
+        // Sự kiện click mở hộp quà
+        gift.addEventListener('click', () => {
+            gift.style.display = 'none'; // Ẩn hộp quà
+            textElement.classList.remove('hidden'); // Hiện text
+            
+            // Chạy hiệu ứng chữ và pháo hoa
+            typeWriter(fullText);
+            
+            // Tạo 100 hạt giấy confetti rơi sẵn
+            for (let i = 0; i < 100; i++) {
+                confetti.push(new Confetti());
+            }
+            
+            animate();
+            
+            // Bắn một loạt pháo hoa ngay lập tức
+            createFirework(canvas.width / 2, canvas.height / 2);
+            createFirework(canvas.width * 0.2, canvas.height * 0.4);
+            createFirework(canvas.width * 0.8, canvas.height * 0.4);
+        });
+
+        // Click lên màn hình để tự bắn pháo hoa sau khi đã mở quà
+        window.addEventListener('click', (e) => {
+            if (gift.style.display === 'none') {
+                createFirework(e.clientX, e.clientY);
+            }
+        });
+    </script>
+</body>
+</html>
